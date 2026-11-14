@@ -4,7 +4,14 @@ A guided breathing app that runs in the browser and can be installed on an iPhon
 
 **Live app:** https://johan-martensson.github.io/breathwork/
 
-> Practice sitting or lying down. Never do breathing exercises in or near water, while driving, or anywhere fainting could be dangerous.
+## Safety
+
+This app is for general wellbeing. It is **not medical advice or treatment**.
+
+- **Where to practice:** always sitting or lying down. **Never** in or near water, while driving, or anywhere fainting could be dangerous.
+- **Check with a doctor first** if you are pregnant, have epilepsy, heart or blood-pressure problems, have had a stroke, or have any other serious health condition.
+- **Never force a breath hold.** Light-headedness and tingling are common. Stop and breathe normally if you feel unwell.
+- Not intended for children. **Use at your own risk.**
 
 ## What it does
 

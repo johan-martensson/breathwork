@@ -2,7 +2,7 @@
 
 const $ = (sel) => document.querySelector(sel);
 
-const APP_VERSION = 9; // keep in step with CACHE in sw.js
+const APP_VERSION = 10; // keep in step with CACHE in sw.js
 
 // ---------- Diagnostics (only shown when the address ends in ?debug) ----------
 
@@ -129,7 +129,14 @@ const STRINGS = {
     best: (t) => `Best ${t}`,
     deleteSession: 'Delete session',
     confirmDelete: 'Delete this session?',
-    safety: 'Practice sitting or lying down. Never do breathing exercises in or near water, while driving, or anywhere fainting could be dangerous.',
+    safety: `<b>Safety</b>
+      <p>This app is for general wellbeing. It is not medical advice or treatment.</p>
+      <ul>
+        <li>Always practice sitting or lying down. Never in or near water, while driving, or anywhere fainting could be dangerous.</li>
+        <li>Talk to a doctor first if you are pregnant, have epilepsy, heart or blood-pressure problems, have had a stroke, or have any other serious health condition.</li>
+        <li>Light-headedness and tingling are common. Never force a breath hold. Stop and breathe normally if you feel unwell.</li>
+        <li>Not intended for children. Use at your own risk.</li>
+      </ul>`,
     end: 'End session',
     roundOf: (r, n) => `Round ${r} of ${n}`,
     complete: 'Complete',
@@ -176,7 +183,14 @@ const STRINGS = {
     best: (t) => `Bäst ${t}`,
     deleteSession: 'Ta bort session',
     confirmDelete: 'Ta bort den här sessionen?',
-    safety: 'Öva sittande eller liggande. Gör aldrig andningsövningar i eller nära vatten, när du kör bil eller där det kan vara farligt att svimma.',
+    safety: `<b>Säkerhet</b>
+      <p>Appen är till för allmänt välbefinnande. Den är inte medicinsk rådgivning eller behandling.</p>
+      <ul>
+        <li>Öva alltid sittande eller liggande. Aldrig i eller nära vatten, när du kör bil eller där det kan vara farligt att svimma.</li>
+        <li>Prata med en läkare först om du är gravid, har epilepsi, hjärt- eller blodtrycksproblem, har haft en stroke eller har någon annan allvarlig sjukdom.</li>
+        <li>Yrsel och stickningar är vanligt. Tvinga aldrig fram ett andningsuppehåll. Avbryt och andas normalt om du mår dåligt.</li>
+        <li>Inte avsedd för barn. Används på egen risk.</li>
+      </ul>`,
     end: 'Avsluta session',
     roundOf: (r, n) => `Runda ${r} av ${n}`,
     complete: 'Klart',
@@ -238,6 +252,7 @@ function applyLanguage() {
   const t = T();
   document.documentElement.lang = settings.lang;
   for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-html]')) el.innerHTML = t[el.dataset.i18nHtml]; // our own fixed text only
   for (const el of document.querySelectorAll('[data-i18n-aria]')) el.setAttribute('aria-label', t[el.dataset.i18nAria]);
 }
 

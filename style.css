@@ -101,6 +101,10 @@ details summary::-webkit-details-marker { display: none; }
 details[open] summary { border-bottom: 1px solid var(--separator); }
 
 .note { color: var(--muted); font-size: 14px; padding: 16px 20px; margin-top: 28px; }
+.note b { color: var(--text); font-weight: 600; }
+.note p { margin: 6px 0 8px; }
+.note ul { margin: 0; padding-left: 18px; }
+.note li + li { margin-top: 6px; }
 .version { color: var(--muted); font-size: 12px; text-align: center; margin: 16px 0 0; opacity: 0.7; }
 
 .debug {
