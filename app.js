@@ -253,6 +253,7 @@ function say(text) {
   // silently falls back to the default English voice reading the Swedish text.
   u.lang = STRINGS[session.cfg.lang].locale;
   u.rate = 0.9;
+  u.onend = () => audio.wake(); // the voice may have paused the breathing sounds
   speechSynthesis.speak(u);
 }
 
@@ -286,13 +287,30 @@ const audio = {
         d[i] = (b0 + b1 + b2 + w * 0.1848) * 0.2;
       }
       this.noise = buf;
+      // On iPhones the spoken voice can pause ("interrupt") this sound engine. Restart it.
+      this.ctx.onstatechange = () => {
+        if (session.active && this.ctx.state !== 'running' && this.ctx.state !== 'closed') {
+          setTimeout(() => this.wake(), 150);
+        }
+      };
     }
     this.ctx.resume();
   },
 
+  wake() {
+    if (this.ctx && this.ctx.state !== 'running' && this.ctx.state !== 'closed') {
+      this.ctx.resume().catch(() => {});
+    }
+  },
+
   // kind: 'in' or 'out'. atPerf: start time on the same clock as the animation (seconds).
   breath(kind, atPerf, dur) {
-    if (!this.ctx || !this.noise || !session.cfg?.sounds || dur <= 0.05) return;
+    if (!this.ctx || !this.noise || !session.cfg?.sounds || dur <= 0.05) return false;
+    if (this.ctx.state !== 'running') {
+      // Its clock is stopped while paused, so a sound queued now would play out of sync.
+      this.wake();
+      return false;
+    }
     const ctx = this.ctx;
     if (!this.bus) {
       // Limiter so the louder breath sounds can never distort.
@@ -340,12 +358,14 @@ const audio = {
     src.stop(start + dur + 0.05);
     this.sources.add(src);
     src.onended = () => this.sources.delete(src);
+    return true;
   },
 
   // One full breath on the circle: inhale on the first half, exhale on the second.
   cycle(atPerf, secs) {
-    this.breath('in', atPerf, secs / 2);
+    const queued = this.breath('in', atPerf, secs / 2);
     this.breath('out', atPerf + secs / 2, secs / 2);
+    return queued;
   },
 
   stopAll() {
@@ -468,7 +488,7 @@ function scheduleBreathSounds(current) {
   const c = session.cfg;
   const upTo = Math.min(current + 1, c.breaths - 1);
   for (let j = Math.max(current, session.scheduledThrough + 1); j <= upTo; j++) {
-    audio.cycle(session.phaseStart + j * c.secs, c.secs);
+    if (!audio.cycle(session.phaseStart + j * c.secs, c.secs)) break; // try again next breath
     session.scheduledThrough = j;
   }
 }
@@ -581,7 +601,7 @@ $('#close').addEventListener('click', (e) => { e.stopPropagation(); closeSession
 $('#done').addEventListener('click', (e) => { e.stopPropagation(); closeSession(); });
 $('#breatheIn').addEventListener('click', (e) => { e.stopPropagation(); endRetention(); });
 sessionEl.addEventListener('click', () => {
-  if (audio.ctx?.state !== 'running') audio.ctx?.resume(); // any tap can wake the sound up
+  audio.wake(); // any tap can wake the sound up
   endRetention();
 });
 
