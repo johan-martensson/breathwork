@@ -1,6 +1,6 @@
 // Offline support. Always tries the network first so a refresh shows the latest
 // version right away; falls back to the saved copy when offline or very slow.
-const CACHE = 'breathwork-v7';
+const CACHE = 'breathwork-v8';
 const NETWORK_TIMEOUT_MS = 4000;
 const ASSETS = [
   './',

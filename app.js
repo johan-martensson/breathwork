@@ -2,7 +2,78 @@
 
 const $ = (sel) => document.querySelector(sel);
 
-const APP_VERSION = 7; // keep in step with CACHE in sw.js
+const APP_VERSION = 8; // keep in step with CACHE in sw.js
+
+// ---------- Diagnostics (only shown when the address ends in ?debug) ----------
+
+const debug = {
+  on: new URLSearchParams(location.search).has('debug'),
+  data: {},
+  el: null,
+  set(key, value) {
+    if (!this.on) return;
+    this.data[key] = value;
+    this.render();
+  },
+  count(key) {
+    if (!this.on) return;
+    this.data[key] = (this.data[key] || 0) + 1;
+    this.render();
+  },
+  error(err) {
+    console.error(err);
+    this.set('last error', err && err.name ? `${err.name}: ${err.message}` : String(err));
+  },
+  render() {
+    if (this.el) this.el.querySelector('pre').textContent = Object.entries(this.data).map(([k, v]) => `${k}: ${v}`).join('\n');
+  },
+  init() {
+    if (!this.on) return;
+    this.el = document.createElement('div');
+    this.el.className = 'debug';
+    this.el.innerHTML = '<pre></pre><button type="button">Test sound</button>';
+    document.body.appendChild(this.el);
+    this.el.querySelector('button').addEventListener('click', () => this.testSound());
+    this.set('version', APP_VERSION);
+    this.set('browser engine', isChromium ? 'Chromium' : 'WebKit/other');
+    this.set('audioSession', navigator.audioSession ? navigator.audioSession.type : 'not available');
+    window.addEventListener('error', (e) => this.error(e.error || e.message));
+    window.addEventListener('unhandledrejection', (e) => this.error(e.reason));
+    setInterval(() => {
+      if (audio.ctx) {
+        this.data.engine = audio.ctx.state;
+        this.data['engine clock'] = audio.ctx.currentTime.toFixed(1);
+      }
+      this.render();
+    }, 500);
+  },
+  // A plain beep, then a burst of the breath noise, straight to the speakers.
+  testSound() {
+    try {
+      audio.unlock();
+      const ctx = audio.ctx;
+      if (!ctx) return this.set('test', 'no Web Audio in this browser');
+      const t = ctx.currentTime + 0.05;
+      const osc = ctx.createOscillator();
+      const g1 = ctx.createGain();
+      g1.gain.value = 0.2;
+      osc.frequency.value = 440;
+      osc.connect(g1).connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.4);
+      const src = ctx.createBufferSource();
+      const g2 = ctx.createGain();
+      g2.gain.value = 0.8;
+      src.buffer = audio.noise;
+      src.connect(g2).connect(ctx.destination);
+      src.start(t + 0.6);
+      src.stop(t + 1.4);
+      this.set('test', `beep + noise sent (engine ${ctx.state})`);
+    } catch (err) {
+      this.error(err);
+    }
+  },
+};
 
 const PACES = { slow: 4.0, medium: 3.0, fast: 2.2 }; // seconds per full breath
 const LIMITS = { rounds: [1, 10, 1], breaths: [10, 60, 5], recovery: [5, 30, 5] }; // min, max, step
@@ -248,13 +319,37 @@ function unlockSpeech() {
   speechSynthesis.speak(u);
 }
 
+// Browsers disagree on how to get a Swedish voice:
+// - Safari and iPhone choose correctly from the language alone, and picking a voice
+//   ourselves can select one that isn't downloaded (iOS then falls back to English).
+// - Chrome-based browsers (Brave, Chrome, Edge) ignore the language and use the system
+//   default voice (often American English) unless a voice is picked explicitly.
+const isChromium = !!navigator.userAgentData;
+let voices = [];
+const loadVoices = () => { voices = speechSynthesis.getVoices(); };
+if (canSpeak) {
+  loadVoices();
+  speechSynthesis.addEventListener?.('voiceschanged', loadVoices);
+}
+
+function voiceFor(locale) {
+  if (!isChromium) return null;
+  if (!voices.length) loadVoices();
+  const want = locale.toLowerCase();
+  const norm = (v) => v.lang.replace('_', '-').toLowerCase();
+  return voices.find((v) => norm(v) === want && v.localService)
+    || voices.find((v) => norm(v) === want)
+    || voices.find((v) => norm(v).startsWith(want.slice(0, 2)))
+    || null;
+}
+
 function say(text) {
   if (!canSpeak || !session.cfg?.voice) return;
   const u = new SpeechSynthesisUtterance(text);
-  // Only set the language and let the phone choose its installed voice for it. Picking a
-  // specific voice from getVoices() can select one that isn't downloaded, and iOS then
-  // silently falls back to the default English voice reading the Swedish text.
   u.lang = STRINGS[session.cfg.lang].locale;
+  const voice = voiceFor(u.lang);
+  if (voice) u.voice = voice;
+  debug.set('voice', voice ? `${voice.name} (${voice.lang})` : `auto for ${u.lang}`);
   u.rate = 0.9;
   u.onend = () => audio.wake(); // the voice may have paused the breathing sounds
   speechSynthesis.speak(u);
@@ -278,6 +373,7 @@ const audio = {
     // iOS: the voice and the breath sounds cut each other off.) Ambient sound follows the
     // silent switch.
     try { if (navigator.audioSession) navigator.audioSession.type = 'ambient'; } catch { /* older iOS */ }
+    debug.set('audioSession', navigator.audioSession ? navigator.audioSession.type : 'not available');
     if (!this.ctx) {
       this.ctx = new Ctx();
       const len = this.ctx.sampleRate * 3;
@@ -312,11 +408,24 @@ const audio = {
   // kind: 'in' or 'out'. atPerf: start time on the same clock as the animation (seconds).
   breath(kind, atPerf, dur) {
     if (!this.ctx || !this.noise || !session.cfg?.sounds || dur <= 0.05) return false;
+    debug.set('engine', this.ctx.state);
     if (this.ctx.state !== 'running') {
       // Its clock is stopped while paused, so a sound queued now would play out of sync.
       this.wake();
+      debug.count('skipped (engine paused)');
       return false;
     }
+    try {
+      this.play(kind, atPerf, dur);
+      debug.count('breath sounds queued');
+      return true;
+    } catch (err) {
+      debug.error(err);
+      return false;
+    }
+  },
+
+  play(kind, atPerf, dur) {
     const ctx = this.ctx;
     if (!this.bus) {
       // Limiter so the louder breath sounds can never distort.
@@ -330,7 +439,8 @@ const audio = {
       this.bus = ctx.createGain();
       this.bus.connect(limiter);
     }
-    const start = ctx.currentTime + Math.max(0, atPerf - now());
+    // Never schedule exactly "now": Safari rejects automation that starts in the past.
+    const start = ctx.currentTime + Math.max(0.02, atPerf - now());
     const inhale = kind === 'in';
 
     const src = ctx.createBufferSource();
@@ -356,15 +466,13 @@ const audio = {
       curve[k] = peak * Math.pow(Math.sin(Math.PI * (inhale ? x : Math.pow(x, 0.55))), 1.4);
     }
     const gain = ctx.createGain();
-    gain.gain.value = 0;
-    gain.gain.setValueCurveAtTime(curve, start, dur);
+    gain.gain.setValueCurveAtTime(curve, start, dur); // the curve starts at 0, so no click
 
     src.connect(band).connect(soften).connect(gain).connect(this.bus);
     src.start(start, Math.random() * 2);
     src.stop(start + dur + 0.05);
     this.sources.add(src);
     src.onended = () => this.sources.delete(src);
-    return true;
   },
 
   // One full breath on the circle: inhale on the first half, exhale on the second.
@@ -612,6 +720,7 @@ sessionEl.addEventListener('click', () => {
 });
 
 renderHome();
+debug.init();
 
 // ---------- Offline support ----------
 
