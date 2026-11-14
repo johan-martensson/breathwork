@@ -8,4 +8,4 @@ Each round: deep breaths with an animated guide → breath hold after exhaling (
 
 > Practice sitting or lying down. Never do breathing exercises in or near water, while driving, or anywhere fainting could be dangerous.
 
-When changing files, bump `CACHE` in `sw.js` so installed copies pick up the update.
+When changing files, bump `APP_VERSION` in `app.js` and `CACHE` in `sw.js` together. The version is shown at the bottom of the home screen.

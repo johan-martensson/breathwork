@@ -2,6 +2,8 @@
 
 const $ = (sel) => document.querySelector(sel);
 
+const APP_VERSION = 7; // keep in step with CACHE in sw.js
+
 const PACES = { slow: 4.0, medium: 3.0, fast: 2.2 }; // seconds per full breath
 const LIMITS = { rounds: [1, 10, 1], breaths: [10, 60, 5], recovery: [5, 30, 5] }; // min, max, step
 const GET_READY = 4;
@@ -158,6 +160,7 @@ function renderHome() {
   }
   $('#voice').checked = settings.voice;
   $('#sounds').checked = settings.sounds;
+  $('#version').textContent = `Version ${APP_VERSION}`;
 
   // Assumes roughly a 90 s breath hold per round.
   const perRound = settings.breaths * PACES[settings.pace] + 90 + settings.recovery + GET_READY;
