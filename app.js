@@ -48,7 +48,7 @@ const STRINGS = {
     done: 'Done',
     round: (r) => `Round ${r}`,
     say: {
-      firstRound: 'Get comfortable. Round one.',
+      firstRound: 'Get comfortable and relax. Round one.',
       round: (r) => `Round ${r}.`,
       firstBreath: 'Breathe in fully, and let go.',
       lastBreath: 'Last breath. Fill up, and let it all go.',
@@ -95,7 +95,7 @@ const STRINGS = {
     done: 'Klar',
     round: (r) => `Runda ${r}`,
     say: {
-      firstRound: 'Sätt dig bekvämt. Runda ett.',
+      firstRound: 'Sätt dig bekvämt och slappna av. Runda ett.',
       round: (r) => `Runda ${r}.`,
       firstBreath: 'Andas in djupt, och släpp.',
       lastBreath: 'Sista andetaget. Fyll lungorna, och släpp ut allt.',
@@ -295,8 +295,16 @@ const audio = {
     if (!this.ctx || !this.noise || !session.cfg?.sounds || dur <= 0.05) return;
     const ctx = this.ctx;
     if (!this.bus) {
+      // Limiter so the louder breath sounds can never distort.
+      const limiter = ctx.createDynamicsCompressor();
+      limiter.threshold.value = -6;
+      limiter.knee.value = 6;
+      limiter.ratio.value = 12;
+      limiter.attack.value = 0.003;
+      limiter.release.value = 0.15;
+      limiter.connect(ctx.destination);
       this.bus = ctx.createGain();
-      this.bus.connect(ctx.destination);
+      this.bus.connect(limiter);
     }
     const start = ctx.currentTime + Math.max(0, atPerf - now());
     const inhale = kind === 'in';
@@ -318,7 +326,7 @@ const audio = {
     // Volume follows the breath: inhale swells and fades evenly; exhale releases quickly, then trails off.
     const n = 64;
     const curve = new Float32Array(n);
-    const peak = inhale ? 0.55 : 0.45;
+    const peak = inhale ? 1.6 : 1.3; // about -13 dB at the loudest point of each breath
     for (let k = 0; k < n; k++) {
       const x = k / (n - 1);
       curve[k] = peak * Math.pow(Math.sin(Math.PI * (inhale ? x : Math.pow(x, 0.55))), 1.4);

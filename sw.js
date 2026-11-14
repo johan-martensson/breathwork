@@ -1,6 +1,7 @@
-// Caches the app so it opens offline. Serves the cached copy first and refreshes
-// it in the background, so an update shows up the next time the app is opened.
-const CACHE = 'breathwork-v3';
+// Offline support. Always tries the network first so a refresh shows the latest
+// version right away; falls back to the saved copy when offline or very slow.
+const CACHE = 'breathwork-v4';
+const NETWORK_TIMEOUT_MS = 4000;
 const ASSETS = [
   './',
   './index.html',
@@ -31,14 +32,16 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
-    const cached = await cache.match(req, { ignoreSearch: true });
-    const network = fetch(req)
-      .then((res) => {
-        if (res.ok) cache.put(req, res.clone());
-        return res;
-      })
-      .catch(() => cached);
-    event.waitUntil(network.then(() => {}, () => {}));
-    return cached || network;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), NETWORK_TIMEOUT_MS);
+    try {
+      const res = await fetch(req, { cache: 'no-cache', signal: controller.signal });
+      if (res.ok) await cache.put(req, res.clone());
+      return res;
+    } catch {
+      return (await cache.match(req, { ignoreSearch: true })) || Response.error();
+    } finally {
+      clearTimeout(timer);
+    }
   })());
 });
