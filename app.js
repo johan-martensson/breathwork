@@ -5,6 +5,109 @@ const $ = (sel) => document.querySelector(sel);
 const PACES = { slow: 4.0, medium: 3.0, fast: 2.2 }; // seconds per full breath
 const LIMITS = { rounds: [1, 10, 1], breaths: [10, 60, 5], recovery: [5, 30, 5] }; // min, max, step
 const GET_READY = 4;
+const RECOVERY_INHALE = 1.5; // seconds of inhale sound when the recovery breath starts
+const LET_GO_EXHALE = 2.0; // seconds of exhale sound when the recovery hold ends
+
+// ---------- Text in each language ----------
+
+const STRINGS = {
+  en: {
+    locale: 'en-US',
+    start: 'Start session',
+    estimate: (r, b, m) => `${r} round${r === 1 ? '' : 's'} · ${b} breaths · about ${m} min`,
+    session: 'Session',
+    rounds: 'Rounds:',
+    breaths: 'Breaths per round:',
+    pace: 'Pace',
+    slow: 'Slow',
+    medium: 'Medium',
+    fast: 'Fast',
+    recovery: 'Recovery hold:',
+    voice: 'Voice guidance',
+    sounds: 'Breathing sounds',
+    language: 'Language',
+    progress: 'Progress',
+    noSessions: 'No sessions yet',
+    bestHold: 'Best hold',
+    sessions: 'Sessions',
+    history: 'History',
+    best: (t) => `Best ${t}`,
+    deleteSession: 'Delete session',
+    confirmDelete: 'Delete this session?',
+    safety: 'Practice sitting or lying down. Never do breathing exercises in or near water, while driving, or anywhere fainting could be dangerous.',
+    end: 'End session',
+    roundOf: (r, n) => `Round ${r} of ${n}`,
+    complete: 'Complete',
+    getReady: 'Get comfortable and relax',
+    inhale: 'Breathe in fully',
+    exhale: 'Let go',
+    hold: 'Exhale and hold.<br>Tap anywhere when you need to breathe.',
+    recoveryHold: 'Breathe in fully and hold',
+    breatheInButton: 'Breathe in',
+    wellDone: 'Well done',
+    done: 'Done',
+    round: (r) => `Round ${r}`,
+    say: {
+      firstRound: 'Get comfortable. Round one.',
+      round: (r) => `Round ${r}.`,
+      firstBreath: 'Breathe in fully, and let go.',
+      lastBreath: 'Last breath. Fill up, and let it all go.',
+      hold: 'Hold.',
+      recovery: 'Breathe in fully, and hold.',
+      letGo: 'And let go.',
+      finished: 'Session complete. Well done.',
+    },
+  },
+  sv: {
+    locale: 'sv-SE',
+    start: 'Starta session',
+    estimate: (r, b, m) => `${r} ${r === 1 ? 'runda' : 'rundor'} · ${b} andetag · cirka ${m} min`,
+    session: 'Session',
+    rounds: 'Rundor:',
+    breaths: 'Andetag per runda:',
+    pace: 'Tempo',
+    slow: 'Långsamt',
+    medium: 'Medel',
+    fast: 'Snabbt',
+    recovery: 'Återhämtning:',
+    voice: 'Röstguidning',
+    sounds: 'Andningsljud',
+    language: 'Språk',
+    progress: 'Framsteg',
+    noSessions: 'Inga sessioner än',
+    bestHold: 'Bästa tid',
+    sessions: 'Sessioner',
+    history: 'Historik',
+    best: (t) => `Bäst ${t}`,
+    deleteSession: 'Ta bort session',
+    confirmDelete: 'Ta bort den här sessionen?',
+    safety: 'Öva sittande eller liggande. Gör aldrig andningsövningar i eller nära vatten, när du kör bil eller där det kan vara farligt att svimma.',
+    end: 'Avsluta session',
+    roundOf: (r, n) => `Runda ${r} av ${n}`,
+    complete: 'Klart',
+    getReady: 'Sätt dig bekvämt och slappna av',
+    inhale: 'Andas in djupt',
+    exhale: 'Släpp',
+    hold: 'Andas ut och håll andan.<br>Tryck var som helst när du behöver andas.',
+    recoveryHold: 'Andas in djupt och håll',
+    breatheInButton: 'Andas in',
+    wellDone: 'Bra jobbat',
+    done: 'Klar',
+    round: (r) => `Runda ${r}`,
+    say: {
+      firstRound: 'Sätt dig bekvämt. Runda ett.',
+      round: (r) => `Runda ${r}.`,
+      firstBreath: 'Andas in djupt, och släpp.',
+      lastBreath: 'Sista andetaget. Fyll lungorna, och släpp ut allt.',
+      hold: 'Håll andan.',
+      recovery: 'Andas in djupt, och håll.',
+      letGo: 'Och släpp.',
+      finished: 'Sessionen är klar. Bra jobbat.',
+    },
+  },
+};
+
+const T = () => STRINGS[settings.lang] || STRINGS.en;
 
 // ---------- Storage (on this device only) ----------
 
@@ -22,8 +125,9 @@ const store = {
   },
 };
 
+const defaultLang = (navigator.language || '').toLowerCase().startsWith('sv') ? 'sv' : 'en';
 const settings = Object.assign(
-  { rounds: 3, breaths: 30, pace: 'medium', recovery: 15, voice: true },
+  { rounds: 3, breaths: 30, pace: 'medium', recovery: 15, voice: true, sounds: true, lang: defaultLang },
   store.get('settings', {})
 );
 let history = store.get('history', []);
@@ -35,22 +139,34 @@ const clock = (s) => {
 
 // ---------- Home screen ----------
 
+function applyLanguage() {
+  const t = T();
+  document.documentElement.lang = settings.lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-aria]')) el.setAttribute('aria-label', t[el.dataset.i18nAria]);
+}
+
 function renderHome() {
+  const t = T();
+  applyLanguage();
   for (const el of document.querySelectorAll('[data-value]')) el.textContent = settings[el.dataset.value];
   for (const btn of document.querySelectorAll('[data-pace]')) {
     btn.setAttribute('aria-checked', String(btn.dataset.pace === settings.pace));
   }
+  for (const btn of document.querySelectorAll('[data-lang]')) {
+    btn.setAttribute('aria-checked', String(btn.dataset.lang === settings.lang));
+  }
   $('#voice').checked = settings.voice;
+  $('#sounds').checked = settings.sounds;
 
   // Assumes roughly a 90 s breath hold per round.
   const perRound = settings.breaths * PACES[settings.pace] + 90 + settings.recovery + GET_READY;
   const minutes = Math.max(1, Math.round((settings.rounds * perRound) / 60));
-  const rounds = `${settings.rounds} round${settings.rounds === 1 ? '' : 's'}`;
-  $('#estimate').textContent = `${rounds} · ${settings.breaths} breaths · about ${minutes} min`;
+  $('#estimate').textContent = t.estimate(settings.rounds, settings.breaths, minutes);
 
   const progress = $('#progress');
   if (history.length === 0) {
-    progress.innerHTML = '<div class="empty">No sessions yet</div>';
+    progress.innerHTML = `<div class="empty">${t.noSessions}</div>`;
     return;
   }
   const best = Math.max(...history.flatMap((r) => r.times));
@@ -58,20 +174,20 @@ function renderHome() {
     <div class="history-item">
       <div class="info">
         <div class="top">
-          <span>${new Date(r.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-          <b>Best ${clock(Math.max(...r.times))}</b>
+          <span>${new Date(r.date).toLocaleDateString(t.locale, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+          <b>${t.best(clock(Math.max(...r.times)))}</b>
         </div>
         <div class="times">${r.times.map(clock).join(' · ')}</div>
       </div>
-      <button type="button" class="delete" data-delete="${i}" aria-label="Delete session">
+      <button type="button" class="delete" data-delete="${i}" aria-label="${t.deleteSession}">
         <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>`).join('');
   progress.innerHTML = `
-    <div class="row"><span>Best hold</span><b>${clock(best)}</b></div>
-    <div class="row"><span>Sessions</span><b>${history.length}</b></div>
+    <div class="row"><span>${t.bestHold}</span><b>${clock(best)}</b></div>
+    <div class="row"><span>${t.sessions}</span><b>${history.length}</b></div>
     <details class="row" style="display:block">
-      <summary class="row" style="border:0">History</summary>
+      <summary class="row" style="border:0">${t.history}</summary>
       ${items}
     </details>`;
 }
@@ -93,21 +209,31 @@ document.querySelectorAll('[data-pace]').forEach((btn) => btn.addEventListener('
   saveSettings();
 }));
 
+document.querySelectorAll('[data-lang]').forEach((btn) => btn.addEventListener('click', () => {
+  settings.lang = btn.dataset.lang;
+  saveSettings();
+}));
+
 $('#voice').addEventListener('change', (e) => {
   settings.voice = e.target.checked;
+  saveSettings();
+});
+
+$('#sounds').addEventListener('change', (e) => {
+  settings.sounds = e.target.checked;
   saveSettings();
 });
 
 $('#progress').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-delete]');
   if (!btn) return;
-  if (!confirm('Delete this session?')) return;
+  if (!confirm(T().confirmDelete)) return;
   history.splice(Number(btn.dataset.delete), 1);
   store.set('history', history);
   renderHome();
 });
 
-// ---------- Voice, vibration, screen lock ----------
+// ---------- Voice ----------
 
 const canSpeak = 'speechSynthesis' in window;
 
@@ -119,13 +245,118 @@ function unlockSpeech() {
   speechSynthesis.speak(u);
 }
 
+function pickVoice(locale) {
+  const voices = speechSynthesis.getVoices();
+  const lang = locale.slice(0, 2);
+  return voices.find((v) => v.lang.replace('_', '-') === locale && v.localService)
+    || voices.find((v) => v.lang.replace('_', '-') === locale)
+    || voices.find((v) => v.lang.toLowerCase().startsWith(lang));
+}
+
 function say(text) {
   if (!canSpeak || !session.cfg?.voice) return;
+  const locale = STRINGS[session.cfg.lang].locale;
   const u = new SpeechSynthesisUtterance(text);
-  u.lang = 'en-US';
+  u.lang = locale;
+  const voice = pickVoice(locale);
+  if (voice) u.voice = voice;
   u.rate = 0.9;
   speechSynthesis.speak(u);
 }
+
+// ---------- Breathing sounds ----------
+// Soft filtered noise shaped like breath: a rising, brighter "in" and a falling, warmer "out".
+// Each sound is scheduled on the audio clock at the exact moment the circle starts that movement.
+
+const audio = {
+  ctx: null,
+  bus: null,
+  noise: null,
+  sources: new Set(),
+
+  // Must run inside a tap (iOS requirement).
+  unlock() {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch { /* older iOS */ }
+    if (!this.ctx) {
+      this.ctx = new Ctx();
+      const len = this.ctx.sampleRate * 3;
+      const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      // Pink-ish noise sounds closer to breath than white noise.
+      let b0 = 0, b1 = 0, b2 = 0;
+      for (let i = 0; i < len; i++) {
+        const w = Math.random() * 2 - 1;
+        b0 = 0.99765 * b0 + w * 0.099046;
+        b1 = 0.963 * b1 + w * 0.2965164;
+        b2 = 0.57 * b2 + w * 1.0526913;
+        d[i] = (b0 + b1 + b2 + w * 0.1848) * 0.2;
+      }
+      this.noise = buf;
+    }
+    this.ctx.resume();
+  },
+
+  // kind: 'in' or 'out'. atPerf: start time on the same clock as the animation (seconds).
+  breath(kind, atPerf, dur) {
+    if (!this.ctx || !this.noise || !session.cfg?.sounds || dur <= 0.05) return;
+    const ctx = this.ctx;
+    if (!this.bus) {
+      this.bus = ctx.createGain();
+      this.bus.connect(ctx.destination);
+    }
+    const start = ctx.currentTime + Math.max(0, atPerf - now());
+    const inhale = kind === 'in';
+
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise;
+    src.loop = true;
+
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.Q.value = 0.8;
+    band.frequency.setValueAtTime(inhale ? 650 : 1150, start);
+    band.frequency.linearRampToValueAtTime(inhale ? 1500 : 450, start + dur);
+
+    const soften = ctx.createBiquadFilter();
+    soften.type = 'lowpass';
+    soften.frequency.value = inhale ? 4200 : 3000;
+
+    // Volume follows the breath: inhale swells and fades evenly; exhale releases quickly, then trails off.
+    const n = 64;
+    const curve = new Float32Array(n);
+    const peak = inhale ? 0.55 : 0.45;
+    for (let k = 0; k < n; k++) {
+      const x = k / (n - 1);
+      curve[k] = peak * Math.pow(Math.sin(Math.PI * (inhale ? x : Math.pow(x, 0.55))), 1.4);
+    }
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+    gain.gain.setValueCurveAtTime(curve, start, dur);
+
+    src.connect(band).connect(soften).connect(gain).connect(this.bus);
+    src.start(start, Math.random() * 2);
+    src.stop(start + dur + 0.05);
+    this.sources.add(src);
+    src.onended = () => this.sources.delete(src);
+  },
+
+  // One full breath on the circle: inhale on the first half, exhale on the second.
+  cycle(atPerf, secs) {
+    this.breath('in', atPerf, secs / 2);
+    this.breath('out', atPerf + secs / 2, secs / 2);
+  },
+
+  stopAll() {
+    for (const s of this.sources) { try { s.stop(); } catch { /* already stopped */ } }
+    this.sources.clear();
+    this.bus?.disconnect();
+    this.bus = null;
+  },
+};
+
+// ---------- Vibration and screen lock ----------
 
 const buzz = (ms) => navigator.vibrate?.(ms); // Works on Android; iPhones ignore it.
 
@@ -137,8 +368,17 @@ function releaseWakeLock() {
   wakeLock?.release().catch(() => {});
   wakeLock = null;
 }
+
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && session.active) requestWakeLock();
+  if (!session.active) return;
+  if (document.visibilityState === 'hidden') {
+    // Drop queued sounds; they'd be out of sync after the audio clock pauses.
+    audio.stopAll();
+  } else {
+    requestWakeLock();
+    audio.ctx?.resume();
+    if (session.phase === 'breathing') session.scheduledThrough = session.lastBreath; // reschedule from now
+  }
 });
 
 // ---------- Session ----------
@@ -156,6 +396,7 @@ const session = {
   times: [],
   cfg: null,
   lastBreath: -1,
+  scheduledThrough: -1,
   raf: 0,
   scale: 0.5,
   shown: { big: null, text: null },
@@ -166,8 +407,9 @@ const elapsed = () => now() - session.phaseStart;
 
 function startSession() {
   unlockSpeech();
+  audio.unlock();
   session.cfg = { ...settings, secs: PACES[settings.pace] };
-  Object.assign(session, { active: true, round: 1, times: [], scale: 0.5 });
+  Object.assign(session, { active: true, round: 1, times: [], scale: 0.5, shown: { big: null, text: null } });
   $('#summary').hidden = true;
   $('#stage').hidden = false;
   sessionEl.hidden = false;
@@ -180,31 +422,33 @@ function closeSession() {
   session.active = false;
   cancelAnimationFrame(session.raf);
   if (canSpeak) speechSynthesis.cancel();
+  audio.stopAll();
   releaseWakeLock();
   sessionEl.hidden = true;
   renderHome();
 }
 
 function enter(phase) {
+  const t = T();
   session.phase = phase;
   session.phaseStart = now();
   sessionEl.dataset.phase = phase;
-  $('#roundLabel').textContent = phase === 'finished'
-    ? 'Complete'
-    : `Round ${session.round} of ${session.cfg.rounds}`;
+  $('#roundLabel').textContent = phase === 'finished' ? t.complete : t.roundOf(session.round, session.cfg.rounds);
 
   switch (phase) {
     case 'getReady':
       session.lastBreath = -1;
-      say(session.round === 1 ? 'Get comfortable. Round one.' : `Round ${session.round}.`);
+      session.scheduledThrough = -1;
+      say(session.round === 1 ? t.say.firstRound : t.say.round(session.round));
       buzz(60);
       break;
     case 'retention':
-      say('Hold.');
+      say(t.say.hold);
       buzz(120);
       break;
     case 'recovery':
-      say('Breathe in fully, and hold.');
+      audio.breath('in', session.phaseStart, RECOVERY_INHALE);
+      say(t.say.recovery);
       buzz(120);
       break;
     case 'finished':
@@ -219,9 +463,20 @@ function endRetention() {
   enter('recovery');
 }
 
+// Keep sounds queued one breath ahead of the animation so they start exactly on time.
+function scheduleBreathSounds(current) {
+  const c = session.cfg;
+  const upTo = Math.min(current + 1, c.breaths - 1);
+  for (let j = Math.max(current, session.scheduledThrough + 1); j <= upTo; j++) {
+    audio.cycle(session.phaseStart + j * c.secs, c.secs);
+    session.scheduledThrough = j;
+  }
+}
+
 function tick() {
   const t = elapsed();
   const c = session.cfg;
+  const s = T().say;
   switch (session.phase) {
     case 'getReady':
       if (t >= GET_READY) enter('breathing');
@@ -232,15 +487,17 @@ function tick() {
         enter('retention');
       } else if (i !== session.lastBreath) {
         session.lastBreath = i;
-        if (i === c.breaths - 1) say('Last breath. Fill up, and let it all go.');
-        else if (i === 0) say('Breathe in fully, and let go.');
+        scheduleBreathSounds(i);
+        if (i === c.breaths - 1) say(s.lastBreath);
+        else if (i === 0) say(s.firstBreath);
         buzz(15);
       }
       break;
     }
     case 'recovery':
       if (t >= c.recovery) {
-        say('And let go.');
+        audio.breath('out', now(), LET_GO_EXHALE);
+        say(s.letGo);
         buzz(120);
         if (session.round < c.rounds) {
           session.round += 1;
@@ -256,6 +513,7 @@ function tick() {
 function render() {
   const t = elapsed();
   const c = session.cfg;
+  const s = T();
   let target = 0.5;
   let big = '';
   let text = '';
@@ -263,24 +521,24 @@ function render() {
   switch (session.phase) {
     case 'getReady':
       big = Math.max(1, Math.ceil(GET_READY - t));
-      text = 'Get comfortable and relax';
+      text = s.getReady;
       break;
     case 'breathing': {
       const f = (t / c.secs) % 1;
       target = 0.5 + (0.5 * (1 - Math.cos(2 * Math.PI * f))) / 2;
       big = Math.min(c.breaths, Math.floor(t / c.secs) + 1);
-      text = f < 0.5 ? 'Breathe in fully' : 'Let go';
+      text = f < 0.5 ? s.inhale : s.exhale;
       break;
     }
     case 'retention':
       target = 0.45 + 0.02 * Math.sin((t * 2 * Math.PI) / 5);
       big = clock(t);
-      text = 'Exhale and hold.<br>Tap anywhere when you need to breathe.';
+      text = s.hold;
       break;
     case 'recovery':
       target = 1;
       big = Math.max(1, Math.ceil(c.recovery - t));
-      text = 'Breathe in fully and hold';
+      text = s.recoveryHold;
       break;
   }
 
@@ -302,16 +560,17 @@ function loop() {
 }
 
 function finish() {
+  const t = T();
   cancelAnimationFrame(session.raf);
   releaseWakeLock();
-  say('Session complete. Well done.');
+  say(t.say.finished);
   buzz([80, 60, 80]);
   if (session.times.length) {
-    history.unshift({ date: new Date().toISOString(), times: session.times.map((t) => Math.round(t * 10) / 10) });
+    history.unshift({ date: new Date().toISOString(), times: session.times.map((x) => Math.round(x * 10) / 10) });
     store.set('history', history);
   }
   $('#summaryList').innerHTML = session.times
-    .map((t, i) => `<div class="row"><span>Round ${i + 1}</span><span>${clock(t)}</span></div>`)
+    .map((x, i) => `<div class="row"><span>${t.round(i + 1)}</span><span>${clock(x)}</span></div>`)
     .join('');
   $('#stage').hidden = true;
   $('#summary').hidden = false;
@@ -321,7 +580,10 @@ $('#start').addEventListener('click', startSession);
 $('#close').addEventListener('click', (e) => { e.stopPropagation(); closeSession(); });
 $('#done').addEventListener('click', (e) => { e.stopPropagation(); closeSession(); });
 $('#breatheIn').addEventListener('click', (e) => { e.stopPropagation(); endRetention(); });
-sessionEl.addEventListener('click', endRetention);
+sessionEl.addEventListener('click', () => {
+  if (audio.ctx?.state !== 'running') audio.ctx?.resume(); // any tap can wake the sound up
+  endRetention();
+});
 
 renderHome();
 

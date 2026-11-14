@@ -1,6 +1,6 @@
 // Caches the app so it opens offline. Serves the cached copy first and refreshes
 // it in the background, so an update shows up the next time the app is opened.
-const CACHE = 'breathwork-v1';
+const CACHE = 'breathwork-v2';
 const ASSETS = [
   './',
   './index.html',

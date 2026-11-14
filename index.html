@@ -20,59 +20,67 @@
 
     <button id="start" class="start" type="button">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h10a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h7a2.5 2.5 0 1 1-2.5 2.5"/></svg>
-      Start session
+      <span data-i18n="start"></span>
     </button>
     <p class="footnote" id="estimate"></p>
 
-    <h2>Session</h2>
+    <h2 data-i18n="session"></h2>
     <section class="card">
       <div class="row">
-        <span>Rounds: <b data-value="rounds"></b></span>
+        <span><span data-i18n="rounds"></span> <b data-value="rounds"></b></span>
         <div class="stepper">
-          <button type="button" data-key="rounds" data-step="-1" aria-label="Fewer rounds">−</button>
-          <button type="button" data-key="rounds" data-step="1" aria-label="More rounds">+</button>
+          <button type="button" data-key="rounds" data-step="-1" aria-label="−">−</button>
+          <button type="button" data-key="rounds" data-step="1" aria-label="+">+</button>
         </div>
       </div>
       <div class="row">
-        <span>Breaths per round: <b data-value="breaths"></b></span>
+        <span><span data-i18n="breaths"></span> <b data-value="breaths"></b></span>
         <div class="stepper">
-          <button type="button" data-key="breaths" data-step="-1" aria-label="Fewer breaths">−</button>
-          <button type="button" data-key="breaths" data-step="1" aria-label="More breaths">+</button>
+          <button type="button" data-key="breaths" data-step="-1" aria-label="−">−</button>
+          <button type="button" data-key="breaths" data-step="1" aria-label="+">+</button>
         </div>
       </div>
       <div class="row">
-        <div class="segmented" role="radiogroup" aria-label="Pace">
-          <button type="button" data-pace="slow" role="radio">Slow</button>
-          <button type="button" data-pace="medium" role="radio">Medium</button>
-          <button type="button" data-pace="fast" role="radio">Fast</button>
+        <div class="segmented" role="radiogroup" data-i18n-aria="pace">
+          <button type="button" data-pace="slow" role="radio" data-i18n="slow"></button>
+          <button type="button" data-pace="medium" role="radio" data-i18n="medium"></button>
+          <button type="button" data-pace="fast" role="radio" data-i18n="fast"></button>
         </div>
       </div>
       <div class="row">
-        <span>Recovery hold: <b data-value="recovery"></b> s</span>
+        <span><span data-i18n="recovery"></span> <b data-value="recovery"></b> s</span>
         <div class="stepper">
-          <button type="button" data-key="recovery" data-step="-1" aria-label="Shorter recovery hold">−</button>
-          <button type="button" data-key="recovery" data-step="1" aria-label="Longer recovery hold">+</button>
+          <button type="button" data-key="recovery" data-step="-1" aria-label="−">−</button>
+          <button type="button" data-key="recovery" data-step="1" aria-label="+">+</button>
         </div>
       </div>
       <label class="row">
-        <span>Voice guidance</span>
+        <span data-i18n="voice"></span>
         <input type="checkbox" id="voice" class="switch">
       </label>
+      <label class="row">
+        <span data-i18n="sounds"></span>
+        <input type="checkbox" id="sounds" class="switch">
+      </label>
+      <div class="row">
+        <span data-i18n="language"></span>
+        <div class="segmented compact" role="radiogroup" data-i18n-aria="language">
+          <button type="button" data-lang="en" role="radio">English</button>
+          <button type="button" data-lang="sv" role="radio">Svenska</button>
+        </div>
+      </div>
     </section>
 
-    <h2>Progress</h2>
+    <h2 data-i18n="progress"></h2>
     <section class="card" id="progress"></section>
 
-    <section class="card note">
-      Practice sitting or lying down. Never do breathing exercises in or near water, while driving,
-      or anywhere fainting could be dangerous.
-    </section>
+    <section class="card note" data-i18n="safety"></section>
   </main>
 
   <div id="session" hidden data-phase="idle">
     <header>
       <span id="roundLabel"></span>
-      <button type="button" id="close" class="icon-btn" aria-label="End session">
+      <button type="button" id="close" class="icon-btn" data-i18n-aria="end">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </header>
@@ -88,14 +96,14 @@
         <div class="big" id="big"></div>
       </div>
       <p class="instruction" id="instruction"></p>
-      <button type="button" id="breatheIn" class="pill">Breathe in</button>
+      <button type="button" id="breatheIn" class="pill" data-i18n="breatheInButton"></button>
     </div>
 
     <div class="summary" id="summary" hidden>
       <svg class="check" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M7.5 12.5l3 3 6-6.5"/></svg>
-      <h2>Well done</h2>
+      <h2 data-i18n="wellDone"></h2>
       <div class="card" id="summaryList"></div>
-      <button type="button" id="done" class="pill">Done</button>
+      <button type="button" id="done" class="pill" data-i18n="done"></button>
     </div>
   </div>
 

@@ -69,6 +69,8 @@ h2 { font-size: 20px; font-weight: 600; color: var(--muted); margin: 28px 20px 8
 .segmented { flex: 1; display: flex; background: var(--control); border-radius: 20px; padding: 3px; }
 .segmented button { flex: 1; padding: 6px 0; border-radius: 17px; font-size: 15px; }
 .segmented button[aria-checked="true"] { background: #636366; font-weight: 600; }
+.segmented.compact { flex: 0 0 auto; }
+.segmented.compact button { flex: 0 0 auto; padding: 6px 14px; }
 
 .switch {
   appearance: none; -webkit-appearance: none; margin: 0;
