@@ -245,21 +245,13 @@ function unlockSpeech() {
   speechSynthesis.speak(u);
 }
 
-function pickVoice(locale) {
-  const voices = speechSynthesis.getVoices();
-  const lang = locale.slice(0, 2);
-  return voices.find((v) => v.lang.replace('_', '-') === locale && v.localService)
-    || voices.find((v) => v.lang.replace('_', '-') === locale)
-    || voices.find((v) => v.lang.toLowerCase().startsWith(lang));
-}
-
 function say(text) {
   if (!canSpeak || !session.cfg?.voice) return;
-  const locale = STRINGS[session.cfg.lang].locale;
   const u = new SpeechSynthesisUtterance(text);
-  u.lang = locale;
-  const voice = pickVoice(locale);
-  if (voice) u.voice = voice;
+  // Only set the language and let the phone choose its installed voice for it. Picking a
+  // specific voice from getVoices() can select one that isn't downloaded, and iOS then
+  // silently falls back to the default English voice reading the Swedish text.
+  u.lang = STRINGS[session.cfg.lang].locale;
   u.rate = 0.9;
   speechSynthesis.speak(u);
 }
