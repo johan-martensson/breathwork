@@ -271,7 +271,10 @@ const audio = {
   unlock() {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     if (!Ctx) return;
-    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch { /* older iOS */ }
+    // 'ambient' lets the breath sounds mix with the spoken voice. ('playback' is exclusive on
+    // iOS: the voice and the breath sounds cut each other off.) Ambient sound follows the
+    // silent switch.
+    try { if (navigator.audioSession) navigator.audioSession.type = 'ambient'; } catch { /* older iOS */ }
     if (!this.ctx) {
       this.ctx = new Ctx();
       const len = this.ctx.sampleRate * 3;
