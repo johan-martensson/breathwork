@@ -2,7 +2,7 @@
 
 const $ = (sel) => document.querySelector(sel);
 
-const APP_VERSION = 8; // keep in step with CACHE in sw.js
+const APP_VERSION = 9; // keep in step with CACHE in sw.js
 
 // ---------- Diagnostics (only shown when the address ends in ?debug) ----------
 
@@ -31,12 +31,34 @@ const debug = {
     if (!this.on) return;
     this.el = document.createElement('div');
     this.el.className = 'debug';
-    this.el.innerHTML = '<pre></pre><button type="button">Test sound</button>';
+    this.el.innerHTML = '<pre></pre><button type="button" data-act="test">Test sound</button> <button type="button" data-act="copy">Copy</button>';
     document.body.appendChild(this.el);
-    this.el.querySelector('button').addEventListener('click', () => this.testSound());
+    this.el.querySelector('[data-act="test"]').addEventListener('click', () => this.testSound());
+    this.el.querySelector('[data-act="copy"]').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      const text = this.el.querySelector('pre').textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        // Fallback for browsers that block the clipboard API.
+        const ta = Object.assign(document.createElement('textarea'), { value: text });
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+      btn.textContent = 'Copied ✓';
+      setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+    });
     this.set('version', APP_VERSION);
     this.set('browser engine', isChromium ? 'Chromium' : 'WebKit/other');
     this.set('audioSession', navigator.audioSession ? navigator.audioSession.type : 'not available');
+    const showVoices = () => {
+      const v = canSpeak ? speechSynthesis.getVoices() : [];
+      this.set('voices available', `${v.length} total, Swedish: ${v.filter((x) => /^sv/i.test(x.lang)).map((x) => x.name).join(', ') || 'none'}`);
+    };
+    showVoices();
+    if (canSpeak) speechSynthesis.addEventListener?.('voiceschanged', showVoices);
     window.addEventListener('error', (e) => this.error(e.error || e.message));
     window.addEventListener('unhandledrejection', (e) => this.error(e.reason));
     setInterval(() => {
