@@ -2,7 +2,7 @@
 
 const $ = (sel) => document.querySelector(sel);
 
-const APP_VERSION = 13; // keep in step with CACHE in sw.js
+const APP_VERSION = 14; // keep in step with CACHE in sw.js
 
 // ---------- Diagnostics (only shown when the address ends in ?debug) ----------
 
@@ -560,7 +560,7 @@ const music = {
 
       // A major add9, spread low: A2 E3 B3 C#4 E4.
       const notes = [110, 164.81, 246.94, 277.18, 329.63];
-      const level = [0.022, 0.018, 0.011, 0.01, 0.007]; // well below the voice and breath sounds
+      const level = [0.033, 0.027, 0.0165, 0.015, 0.0105]; // well below the voice and breath sounds
       const rates = [0.031, 0.047, 0.059, 0.071, 0.083]; // Hz: 12–32 s per swell
       notes.forEach((f, i) => {
         const g = ctx.createGain();
