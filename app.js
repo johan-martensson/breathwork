@@ -2,7 +2,7 @@
 
 const $ = (sel) => document.querySelector(sel);
 
-const APP_VERSION = 12; // keep in step with CACHE in sw.js
+const APP_VERSION = 13; // keep in step with CACHE in sw.js
 
 // ---------- Diagnostics (only shown when the address ends in ?debug) ----------
 
@@ -120,6 +120,7 @@ const STRINGS = {
     recovery: 'Recovery hold:',
     voice: 'Voice guidance',
     sounds: 'Breathing sounds',
+    music: 'Music during hold',
     language: 'Language',
     progress: 'Progress',
     noSessions: 'No sessions yet',
@@ -174,6 +175,7 @@ const STRINGS = {
     recovery: 'Återhämtning:',
     voice: 'Röstguidning',
     sounds: 'Andningsljud',
+    music: 'Musik när du håller andan',
     language: 'Språk',
     progress: 'Framsteg',
     noSessions: 'Inga sessioner än',
@@ -236,7 +238,7 @@ const store = {
 
 const defaultLang = (navigator.language || '').toLowerCase().startsWith('sv') ? 'sv' : 'en';
 const settings = Object.assign(
-  { rounds: 3, breaths: 30, pace: 'medium', recovery: 15, voice: true, sounds: true, lang: defaultLang },
+  { rounds: 3, breaths: 30, pace: 'medium', recovery: 15, voice: true, sounds: true, music: false, lang: defaultLang },
   store.get('settings', {})
 );
 let history = store.get('history', []);
@@ -268,6 +270,7 @@ function renderHome() {
   }
   $('#voice').checked = settings.voice;
   $('#sounds').checked = settings.sounds;
+  $('#music').checked = settings.music;
   $('#version').textContent = `Version ${APP_VERSION}`;
 
   // Assumes roughly a 90 s breath hold per round.
@@ -332,6 +335,11 @@ $('#voice').addEventListener('change', (e) => {
 
 $('#sounds').addEventListener('change', (e) => {
   settings.sounds = e.target.checked;
+  saveSettings();
+});
+
+$('#music').addEventListener('change', (e) => {
+  settings.music = e.target.checked;
   saveSettings();
 });
 
@@ -527,6 +535,79 @@ const audio = {
   },
 };
 
+// ---------- Hold music ----------
+// A soft, slowly shifting chord generated on the fly (no audio files, works offline).
+// Each note swells at its own slow, unrelated rate, so the sound never hints at how much
+// time has passed. It fades in when the hold starts and out when the recovery breath begins.
+
+const music = {
+  out: null,
+  oscs: [],
+
+  start() {
+    const ctx = audio.ctx;
+    if (!ctx || !session.cfg?.music || this.out) return;
+    try {
+      audio.wake();
+      const t0 = ctx.currentTime + 0.05;
+      const out = ctx.createGain();
+      out.gain.setValueAtTime(0, t0);
+      out.gain.linearRampToValueAtTime(1, t0 + 5); // slow fade-in
+      const tone = ctx.createBiquadFilter();
+      tone.type = 'lowpass';
+      tone.frequency.value = 900;
+      tone.connect(out).connect(ctx.destination);
+
+      // A major add9, spread low: A2 E3 B3 C#4 E4.
+      const notes = [110, 164.81, 246.94, 277.18, 329.63];
+      const level = [0.022, 0.018, 0.011, 0.01, 0.007]; // well below the voice and breath sounds
+      const rates = [0.031, 0.047, 0.059, 0.071, 0.083]; // Hz: 12–32 s per swell
+      notes.forEach((f, i) => {
+        const g = ctx.createGain();
+        // Gentle swell: the note's level drifts between about 30% and 100%.
+        const lfo = ctx.createOscillator();
+        lfo.frequency.value = rates[i];
+        const depth = ctx.createGain();
+        depth.gain.value = level[i] * 0.35;
+        lfo.connect(depth).connect(g.gain);
+        g.gain.value = level[i] * 0.65;
+        g.connect(tone);
+        // Two slightly detuned oscillators per note give a warm, slowly beating pad.
+        for (const detune of [-4, 4]) {
+          const o = ctx.createOscillator();
+          o.type = i === 0 ? 'sine' : 'triangle';
+          o.frequency.value = f;
+          o.detune.value = detune;
+          o.connect(g);
+          o.start(t0);
+          this.oscs.push(o);
+        }
+        lfo.start(t0, Math.random() * 10);
+        this.oscs.push(lfo);
+      });
+      this.out = out;
+      debug.count('hold music started');
+    } catch (err) {
+      debug.error(err);
+    }
+  },
+
+  stop(fade = 2) {
+    const ctx = audio.ctx;
+    if (!ctx || !this.out) return;
+    const out = this.out;
+    const oscs = this.oscs;
+    this.out = null;
+    this.oscs = [];
+    const t = ctx.currentTime;
+    out.gain.cancelScheduledValues(t);
+    out.gain.setValueAtTime(out.gain.value, t);
+    out.gain.linearRampToValueAtTime(0, t + fade);
+    for (const o of oscs) { try { o.stop(t + fade + 0.05); } catch { /* already stopped */ } }
+    setTimeout(() => out.disconnect(), (fade + 0.5) * 1000);
+  },
+};
+
 // ---------- Vibration and screen lock ----------
 
 const buzz = (ms) => navigator.vibrate?.(ms); // Works on Android; iPhones ignore it.
@@ -545,10 +626,12 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
     // Drop queued sounds; they'd be out of sync after the audio clock pauses.
     audio.stopAll();
+    music.stop(0.05);
   } else {
     requestWakeLock();
     audio.ctx?.resume();
     if (session.phase === 'breathing') session.scheduledThrough = session.lastBreath; // reschedule from now
+    if (session.phase === 'retention') music.start();
   }
 });
 
@@ -594,6 +677,7 @@ function closeSession() {
   cancelAnimationFrame(session.raf);
   if (canSpeak) speechSynthesis.cancel();
   audio.stopAll();
+  music.stop(0.3);
   releaseWakeLock();
   sessionEl.hidden = true;
   renderHome();
@@ -615,9 +699,11 @@ function enter(phase) {
       break;
     case 'retention':
       say(t.say.hold);
+      music.start();
       buzz(120);
       break;
     case 'recovery':
+      music.stop();
       audio.breath('in', session.phaseStart, RECOVERY_INHALE);
       say(t.say.recovery);
       buzz(120);
