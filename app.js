@@ -2,7 +2,7 @@
 
 const $ = (sel) => document.querySelector(sel);
 
-const APP_VERSION = 11; // keep in step with CACHE in sw.js
+const APP_VERSION = 12; // keep in step with CACHE in sw.js
 
 // ---------- Diagnostics (only shown when the address ends in ?debug) ----------
 
@@ -497,7 +497,7 @@ const audio = {
     // Volume follows the breath: inhale swells and fades evenly; exhale releases quickly, then trails off.
     const n = 64;
     const curve = new Float32Array(n);
-    const peak = inhale ? 1.6 : 1.3; // about -13 dB at the loudest point of each breath
+    const peak = inhale ? 0.8 : 0.65; // about -19 dB at the loudest point, so the voice stays on top
     for (let k = 0; k < n; k++) {
       const x = k / (n - 1);
       curve[k] = peak * Math.pow(Math.sin(Math.PI * (inhale ? x : Math.pow(x, 0.55))), 1.4);
